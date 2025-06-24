@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>VDA Assistant</title>
+  <style>
+    body, html {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+    }
+    .main-wrapper {
+      display: flex;
+      min-height: 100vh;
+      background: #121212;
+    }
+    .sidebar {
+      width: 80px;
+      background: linear-gradient(180deg, #23243a 0%, #1a1a2b 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding-top: 22px;
+      box-shadow: 2px 0 16px #0004;
+    }
+    .sidebar-header {
+      margin-bottom: 24px;
+    }
+    .sidebar-title {
+      color: #7b5cff;
+      font-size: 1.8rem;
+      font-weight: 900;
+      letter-spacing: 1px;
+      writing-mode: vertical-lr;
+      transform: rotate(270deg);
+      user-select: none;
+    }
+    .sidebar-nav {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      width: 100%;
+      align-items: center;
+    }
+    .sidebar-btn {
+      background: none;
+      border: none;
+      outline: none;
+      cursor: pointer;
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s;
+      color: #cfd8dc;
+      font-size: 1.6rem;
+    }
+    .sidebar-btn:hover, .sidebar-btn.active {
+      background: #2a2a3d;
+      color: #7b5cff;
+    }
+    .icon {
+      pointer-events: none;
+    }
+    .content {
+      flex: 1;
+      padding: 2rem 1rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 100%;
+    }
+    .assistant-container { width: 100%; max-width: 600px; display: flex; flex-direction: column; gap: 1rem; }
+    #commandInput { width: 100%; padding: 1rem 1.25rem; font-size: 1.15rem; border-radius: 8px; border: 2px solid #4a90e2; background-color: #2a2a3d; color: #e0e0e0; outline: none; transition: border-color 0.3s ease, box-shadow 0.3s ease; }
+    #commandInput::placeholder { color: #a0a0b8; }
+    #commandInput:focus { border-color: #7b5cff; box-shadow: 0 0 10px rgba(123, 92, 255, 0.7); background-color: #35354a; }
+    .buttons { display: flex; gap: 1rem; justify-content: flex-end; flex-wrap: wrap; }
+    button { cursor: pointer; background-color: #4a90e2; color: white; border: none; border-radius: 8px; padding: 0.75rem 2rem; font-size: 1.1rem; font-weight: 700; box-shadow: 0 4px 12px rgba(74, 144, 226, 0.5); transition: background-color 0.3s ease, box-shadow 0.2s ease, transform 0.15s ease; user-select: none; flex: 1 1 auto; min-width: 120px; }
+    button:hover { background-color: #7b5cff; box-shadow: 0 6px 20px rgba(123, 92, 255, 0.7); transform: translateY(-3px); }
+    button:active { transform: translateY(0); box-shadow: 0 3px 10px rgba(123, 92, 255, 0.5); }
+    #response { margin-top: 2rem; padding: 1.5rem 2rem; border-radius: 10px; min-height: 140px; background-color: #1e1e2f; box-shadow: 0 4px 15px rgba(74, 144, 226, 0.3); font-size: 1.15rem; line-height: 1.6; white-space: pre-wrap; color: #cfd8dc; border: 1px solid #3a3a5c; max-width: 600px; width: 100%; overflow-y: auto; max-height: 300px; }
+    .voice-status {
+      margin-top: 1.5rem;
+      color: #7b5cff;
+      font-weight: 700;
+      text-align: center;
+      font-size: 1.1rem;
+      letter-spacing: 1px;
+      min-height: 24px;
+    }
+    @media (max-width: 600px) {
+      .sidebar { width: 60px; padding-top: 12px; }
+      .sidebar-title { font-size: 1.15rem; }
+      .sidebar-btn { width: 36px; height: 36px; font-size: 1.1rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="main-wrapper">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <span class="sidebar-title">VDA</span>
+      </div>
+      <nav class="sidebar-nav">
+        <button class="sidebar-btn" id="homeBtn" title="Home">
+          <span class="icon">🏠</span>
+        </button>
+        <button class="sidebar-btn" id="searchBtn" title="Search">
+          <span class="icon">🔍</span>
+        </button>
+        <button class="sidebar-btn" id="settingsBtn" title="Settings">
+          <span class="icon">⚙️</span>
+        </button>
+        <button class="sidebar-btn" id="logoutBtn" title="Logout">
+          <span class="icon">🚪</span>
+        </button>
+      </nav>
+    </aside>
+    <main class="content">
+      <div class="assistant-container">
+        <input type="text" id="commandInput" placeholder="Type here..." autocomplete="on" aria-label="Command input" />
+        <div class="buttons">
+          <button id="sendBtn" type="button">Send Command</button>
+          <button id="voiceBtn" type="button" title="Voice Input">Voice Input</button>
+        </div>
+        <div id="response" role="region" aria-live="polite" aria-label="Assistant response"></div>
+        <div class="voice-status" id="voiceStatus"></div>
+      </div>
+    </main>
+  </div>
+  <script>
+    const commandInput = document.getElementById('commandInput');
+    const sendBtn = document.getElementById('sendBtn');
+    const voiceBtn = document.getElementById('voiceBtn');
+    const responseDiv = document.getElementById('response');
+    const voiceStatus = document.getElementById('voiceStatus');
+    document.getElementById('homeBtn').onclick = function() {
+      window.location.href = '/home';
+    };
+    document.getElementById('searchBtn').onclick = function() {
+      window.location.href = '/search';
+    };
+    document.getElementById('settingsBtn').onclick = function() {
+      window.location.href = '/settings';
+    };
+    document.getElementById('logoutBtn').onclick = function() {
+      window.location.href = '/logout';
+    };
+
+    async function sendCommand() {
+      const command = commandInput.value.trim();
+      if (!command) {
+        alert('Please enter a command');
+        return;
+      }
+      responseDiv.textContent = 'Processing...';
+      try {
+        const res = await fetch('/api/command', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ command }),
+        });
+        if (!res.ok) throw new Error(`Server error: ${res.status}`);
+        const data = await res.json();
+        if (data.error) { responseDiv.textContent = `Error: ${data.error}`; }
+        else { responseDiv.textContent = data.response; }
+        commandInput.value = "";
+      } catch (err) {
+        responseDiv.textContent = `Fetch error: ${err.message}`;
+      }
+    }
+    sendBtn.addEventListener('click', sendCommand);
+    commandInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        sendCommand();
+      }
+    });
+
+    // --- Voice Recognition Logic ---
+    let recognition, listening = false, awaitingWakeWord = true;
+
+    function setupRecognition() {
+      if (!('webkitSpeechRecognition' in window)) {
+        alert('Your browser does not support speech recognition.');
+        voiceBtn.disabled = true;
+        return null;
+      }
+      const recog = new webkitSpeechRecognition();
+      recog.continuous = true; // Continuous mode
+      recog.interimResults = false;
+      recog.lang = 'en-US';
+      return recog;
+    }
+
+    function startWakeWordListener() {
+      awaitingWakeWord = true;
+      voiceStatus.textContent = "Say 'Hi VDA' to activate voice command...";
+      recognition = setupRecognition();
+      if (!recognition) return;
+      recognition.onresult = function(event) {
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          if (event.results[i].isFinal) {
+            const transcript = event.results[i][0].transcript.trim().toLowerCase();
+            if (transcript.includes('hi vda')) {
+              voiceStatus.textContent = "Voice command mode ON. Listening...";
+              recognition.stop();
+              setTimeout(startContinuousListening, 500);
+              break;
+            }
+          }
+        }
+      };
+      recognition.onend = function() {
+        if (awaitingWakeWord) recognition.start();
+      };
+      recognition.start();
+    }
+
+    function startContinuousListening() {
+      awaitingWakeWord = false;
+      listening = true;
+      recognition = setupRecognition();
+      if (!recognition) return;
+      recognition.onresult = function(event) {
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          if (event.results[i].isFinal) {
+            const transcript = event.results[i][0].transcript.trim().toLowerCase();
+            if (transcript.includes('voice command बंद कर दो') || transcript.includes('voice command band kar do') || transcript.includes('stop voice command')) {
+              listening = false;
+              recognition.stop();
+              voiceStatus.textContent = "Voice command mode OFF. Say 'Hi VDA' to reactivate.";
+              setTimeout(startWakeWordListener, 1000);
+              return;
+            }
+            // Otherwise treat as command
+            commandInput.value = transcript;
+            sendCommand();
+          }
+        }
+      };
+      recognition.onend = function() {
+        if (listening) recognition.start();
+      };
+      recognition.start();
+    }
+
+    // Voice Button: manual start for wake word mode
+    voiceBtn.addEventListener('click', () => {
+      if (listening || awaitingWakeWord) {
+        voiceStatus.textContent = "Voice already listening for 'Hi VDA'...";
+        return;
+      }
+      startWakeWordListener();
+    });
+
+    // Auto start wake word listener on page load
+    window.onload = () => {
+      startWakeWordListener();
+    };
+  </script>
+</body>
+</html>

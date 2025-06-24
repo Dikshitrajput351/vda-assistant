@@ -1,0 +1,7 @@
+Flask
+speechrecognition
+pyttsx3
+pygetwindow
+pyautogui
+ultralytics
+google-generativeai
