@@ -1,5 +1,6 @@
 Flask
 gunicorn
+flask-dance
 speechrecognition
 pyttsx3
 pygetwindow
