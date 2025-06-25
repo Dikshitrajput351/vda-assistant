@@ -38,18 +38,23 @@ google_bp = make_google_blueprint(
 app.register_blueprint(google_bp, url_prefix="/login")
 
 # 📝 Load Q&A data and setup FAISS
+embedder = SentenceTransformer('all-MiniLM-L6-v2')
+faiss_index = None
+qa_data = pd.DataFrame(columns=["question", "answer"])
+
 if os.path.exists("data.csv"):
-    qa_data = pd.read_csv("data.csv").dropna()
-    questions = qa_data["question"].tolist()
-    answers = qa_data["answer"].tolist()
-    embedder = SentenceTransformer('all-MiniLM-L6-v2')
-    question_embeddings = embedder.encode(questions, convert_to_numpy=True)
-    index = faiss.IndexFlatL2(question_embeddings.shape[1])
-    index.add(question_embeddings)
+    try:
+        qa_data = pd.read_csv("data.csv").dropna()
+        questions = qa_data["question"].tolist()
+        answers = qa_data["answer"].tolist()
+        question_embeddings = embedder.encode(questions, convert_to_numpy=True)
+        faiss_index = faiss.IndexFlatL2(question_embeddings.shape[1])
+        faiss_index.add(question_embeddings)
+        print("✅ FAISS index loaded with", len(questions), "entries.")
+    except Exception as e:
+        print("❌ Error loading FAISS index:", e)
 else:
-    print("❌ 'data.csv' not found. Creating empty dataset.")
-    qa_data = pd.DataFrame(columns=["question", "answer"])
-    index = None
+    print("❌ 'data.csv' not found. Starting with empty Q&A.")
 
 # 🧠 Load YOLO model
 model_path = "models/VDA_Detection - Copy/runs/detect/train/weights/best.pt"
@@ -108,13 +113,17 @@ def minimize_active_window():
 
 # 🧠 FAISS based answer lookup
 def get_answer_from_local_data(user_input):
-    if index is None or qa_data.empty:
+    if faiss_index is None or qa_data.empty:
         return "Local data is empty or FAISS index not initialized."
-    query_embedding = embedder.encode([user_input])
-    distances, indices = index.search(query_embedding, k=1)
-    match_idx = indices[0][0]
-    score = distances[0][0]
-    return qa_data.iloc[match_idx]['answer'] if score < 1.5 else "माफ़ कीजिए, मुझे इसका जवाब नहीं मिला."
+    try:
+        query_embedding = embedder.encode([user_input], convert_to_numpy=True)
+        distances, indices = faiss_index.search(query_embedding, k=1)
+        match_idx = indices[0][0]
+        score = distances[0][0]
+        return qa_data.iloc[match_idx]['answer'] if score < 1.5 else "माफ़ कीजिए, मुझे इसका जवाब नहीं मिला."
+    except Exception as e:
+        print("Error in FAISS search:", e)
+        return "❌ Internal search error occurred."
 
 # 📸 Object detection with YOLO
 def detect_objects():

@@ -8,7 +8,12 @@ def move_mouse():
     data = request.json
     direction = data.get('direction')
     distance = data.get('distance', 50)
-    directions = {'up': (0, -distance), 'down': (0, distance), 'left': (-distance, 0), 'right': (distance, 0)}
+    directions = {
+        'up': (0, -distance),
+        'down': (0, distance),
+        'left': (-distance, 0),
+        'right': (distance, 0)
+    }
     if direction in directions:
         dx, dy = directions[direction]
         pyautogui.moveRel(dx, dy)
