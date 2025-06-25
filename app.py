@@ -14,19 +14,20 @@ import requests
 from sentence_transformers import SentenceTransformer
 import faiss
 
-# ⚠️ Optional GUI imports (only work locally)
+# ⚠️ Optional GUI imports (only available on desktop)
+GUI_AVAILABLE = False
 try:
-    import pyautogui
-    import pygetwindow as gw
-    import cv2
-    import numpy as np
-    from ultralytics import YOLO
-    GUI_AVAILABLE = True
+    if os.environ.get("RUN_GUI") == "1":
+        import pyautogui
+        import pygetwindow as gw
+        import cv2
+        import numpy as np
+        from ultralytics import YOLO
+        GUI_AVAILABLE = True
 except Exception as e:
     print("[Warning] GUI features disabled:", e)
-    GUI_AVAILABLE = False
 
-# 🔀 Launch control server (local only)
+# 🔁 Launch local control server if RUN_LOCAL_SERVER is set
 if os.environ.get("RUN_LOCAL_SERVER") == "1":
     try:
         subprocess.Popen(["python", "local_control_server.py"])
@@ -39,8 +40,8 @@ app.secret_key = os.environ.get("FLASK_SECRET_KEY", "your-very-secure-secret-key
 
 # 🔐 Google OAuth setup
 google_bp = make_google_blueprint(
-    client_id="YOUR_GOOGLE_CLIENT_ID",
-    client_secret="YOUR_GOOGLE_CLIENT_SECRET",
+    client_id=os.environ.get("GOOGLE_CLIENT_ID", ""),
+    client_secret=os.environ.get("GOOGLE_CLIENT_SECRET", ""),
     redirect_to="google_authorized"
 )
 app.register_blueprint(google_bp, url_prefix="/login")
@@ -54,7 +55,6 @@ if os.path.exists("data.csv"):
     try:
         qa_data = pd.read_csv("data.csv").dropna()
         questions = qa_data["question"].tolist()
-        answers = qa_data["answer"].tolist()
         question_embeddings = embedder.encode(questions, convert_to_numpy=True)
         faiss_index = faiss.IndexFlatL2(question_embeddings.shape[1])
         faiss_index.add(question_embeddings)
@@ -64,7 +64,7 @@ if os.path.exists("data.csv"):
 else:
     print("❌ 'data.csv' not found. Starting with empty Q&A.")
 
-# 🧐 Load YOLO model if possible
+# 🧐 Load YOLO model if GUI is available
 model = None
 if GUI_AVAILABLE:
     model_path = "models/VDA_Detection - Copy/runs/detect/train/weights/best.pt"
@@ -74,7 +74,7 @@ if GUI_AVAILABLE:
 # 🌐 Local control server endpoint
 LOCAL_CONTROL_SERVER = "http://127.0.0.1:5001"
 
-# 🕘 Control functions (only if local)
+# 🕘 Remote control functions (used locally)
 def remote_move_mouse(direction, distance=100):
     try:
         resp = requests.post(f"{LOCAL_CONTROL_SERVER}/move_mouse", json={"direction": direction, "distance": distance}, timeout=5)
