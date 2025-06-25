@@ -27,7 +27,7 @@ try:
 except Exception as e:
     print("[Warning] GUI features disabled:", e)
 
-# 🔁 Launch local control server if RUN_LOCAL_SERVER is set
+# 🔀 Launch local control server if RUN_LOCAL_SERVER is set
 if os.environ.get("RUN_LOCAL_SERVER") == "1":
     try:
         subprocess.Popen(["python", "local_control_server.py"])
@@ -64,7 +64,7 @@ if os.path.exists("data.csv"):
 else:
     print("❌ 'data.csv' not found. Starting with empty Q&A.")
 
-# 🧐 Load YOLO model if GUI is available
+# 😨 Load YOLO model if GUI is available
 model = None
 if GUI_AVAILABLE:
     model_path = "models/VDA_Detection - Copy/runs/detect/train/weights/best.pt"
