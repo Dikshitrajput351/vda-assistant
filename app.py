@@ -2,16 +2,11 @@ import subprocess  # 🔧 Auto-start control server
 
 from flask import Flask, render_template, request, jsonify, redirect, url_for, session, flash
 from flask_dance.contrib.google import make_google_blueprint, google
-import pyautogui
 import webbrowser
 import re
 import os
 import pandas as pd
 import traceback
-import cv2
-import numpy as np
-from ultralytics import YOLO
-import pygetwindow as gw
 import time
 import requests
 
@@ -19,12 +14,25 @@ import requests
 from sentence_transformers import SentenceTransformer
 import faiss
 
-# 🔁 Launch control server (on port 5001) at startup
+# ⚠️ Optional GUI imports (only work locally)
 try:
-    subprocess.Popen(["python", "local_control_server.py"])
-    print("✅ Local control server launched.")
+    import pyautogui
+    import pygetwindow as gw
+    import cv2
+    import numpy as np
+    from ultralytics import YOLO
+    GUI_AVAILABLE = True
 except Exception as e:
-    print("❌ Could not start control server:", e)
+    print("[Warning] GUI features disabled:", e)
+    GUI_AVAILABLE = False
+
+# 🔀 Launch control server (local only)
+if os.environ.get("RUN_LOCAL_SERVER") == "1":
+    try:
+        subprocess.Popen(["python", "local_control_server.py"])
+        print("✅ Local control server launched.")
+    except Exception as e:
+        print("❌ Could not start control server:", e)
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "your-very-secure-secret-key")
@@ -56,14 +64,17 @@ if os.path.exists("data.csv"):
 else:
     print("❌ 'data.csv' not found. Starting with empty Q&A.")
 
-# 🧠 Load YOLO model
-model_path = "models/VDA_Detection - Copy/runs/detect/train/weights/best.pt"
-model = YOLO(model_path) if os.path.exists(model_path) else None
+# 🧐 Load YOLO model if possible
+model = None
+if GUI_AVAILABLE:
+    model_path = "models/VDA_Detection - Copy/runs/detect/train/weights/best.pt"
+    if os.path.exists(model_path):
+        model = YOLO(model_path)
 
 # 🌐 Local control server endpoint
 LOCAL_CONTROL_SERVER = "http://127.0.0.1:5001"
 
-# 🕘 Control functions
+# 🕘 Control functions (only if local)
 def remote_move_mouse(direction, distance=100):
     try:
         resp = requests.post(f"{LOCAL_CONTROL_SERVER}/move_mouse", json={"direction": direction, "distance": distance}, timeout=5)
@@ -99,8 +110,9 @@ def remote_type_text(text):
     except Exception as e:
         return f"Error: {e}"
 
-# 🔹 Minimize window
 def minimize_active_window():
+    if not GUI_AVAILABLE:
+        return False
     try:
         active_window = gw.getActiveWindow()
         if active_window:
@@ -111,7 +123,6 @@ def minimize_active_window():
         print("Error minimizing window:", e)
     return False
 
-# 🧠 FAISS based answer lookup
 def get_answer_from_local_data(user_input):
     if faiss_index is None or qa_data.empty:
         return "Local data is empty or FAISS index not initialized."
@@ -125,7 +136,6 @@ def get_answer_from_local_data(user_input):
         print("Error in FAISS search:", e)
         return "❌ Internal search error occurred."
 
-# 📸 Object detection with YOLO
 def detect_objects():
     if not model:
         return []
@@ -141,7 +151,6 @@ def detect_objects():
             detections.append({"class": model.names[int(cls)], "center": [int((x1+x2)/2), int((y1+y2)/2)]})
     return detections
 
-# 🧠 Main processor
 def process_command(command):
     cmd = command.lower().strip()
     if cmd.startswith("move") and any(d in cmd for d in ["up", "down", "left", "right"]):
@@ -152,6 +161,7 @@ def process_command(command):
     if "click" in cmd: return remote_click()
     if cmd.startswith("type "): return remote_type_text(cmd[5:].strip())
     if cmd == "detect objects":
+        if not GUI_AVAILABLE: return "YOLO object detection only available on desktop."
         detections = detect_objects()
         return f"Detected: {', '.join([d['class'] for d in detections])}" if detections else "No objects detected."
     if cmd.startswith("google search for "):
@@ -177,7 +187,6 @@ def process_command(command):
         return f"Searched for {q}"
     return get_answer_from_local_data(command)
 
-# 🌐 ROUTES
 @app.route('/')
 def index():
     if 'user' not in session:
@@ -231,6 +240,5 @@ def api_command():
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
-# 🚀 START SERVER
 if __name__ == '__main__':
     app.run(debug=True)
